@@ -1,7 +1,8 @@
 # API package
 import os
 import time
-from ytmusicapi import YTMusic
+import json
+from ytmusicapi import YTMusic, OAuthCredentials
 
 _ytmusic_instance = None
 _last_request_time = 0
@@ -9,27 +10,58 @@ _min_request_delay = 0.5  # Minimum delay between requests (seconds)
 
 def get_ytmusic():
     """
-    Initialize YTMusic with authentication if headers_auth.json exists.
-    This helps avoid bot detection errors.
+    Initialize YTMusic with OAuth authentication (preferred) or headers_auth.json fallback.
+    OAuth is more reliable and less prone to bot detection errors.
     
-    Note: If you're still getting bot detection errors even with headers_auth.json,
-    your cookies may have expired. You need to refresh them by:
-    1. Going to https://music.youtube.com in your browser
-    2. Exporting fresh cookies using the ytmusicapi setup instructions
-    3. Replacing your headers_auth.json file
+    Priority:
+    1. OAuth (oauth.json + oauth_config.json with client_id/client_secret)
+    2. headers_auth.json (cookie-based, may expire)
+    3. No authentication (may trigger bot detection)
     """
     global _ytmusic_instance
     if _ytmusic_instance is None:
+        # Try OAuth first (preferred method)
+        oauth_file = "oauth.json"
+        oauth_config_file = "oauth_config.json"
+        
+        if os.path.exists(oauth_file) and os.path.exists(oauth_config_file):
+            try:
+                # Load OAuth credentials
+                with open(oauth_config_file, 'r') as f:
+                    oauth_config = json.load(f)
+                
+                client_id = oauth_config.get('client_id')
+                client_secret = oauth_config.get('client_secret')
+                
+                if client_id and client_secret:
+                    oauth_credentials = OAuthCredentials(
+                        client_id=client_id,
+                        client_secret=client_secret
+                    )
+                    _ytmusic_instance = YTMusic(oauth_file, oauth_credentials=oauth_credentials)
+                    print("Using OAuth authentication")
+                    return _ytmusic_instance
+                else:
+                    print("Warning: oauth_config.json missing client_id or client_secret")
+            except Exception as e:
+                print(f"Warning: Failed to use OAuth authentication: {e}")
+                print("Falling back to headers_auth.json...")
+        
+        # Fallback to headers_auth.json
         auth_file = "headers_auth.json"
         if os.path.exists(auth_file):
             try:
                 _ytmusic_instance = YTMusic(auth_file)
+                print("Using headers_auth.json authentication")
+                return _ytmusic_instance
             except Exception as e:
                 print(f"Warning: Failed to use {auth_file}, falling back to default: {e}")
-                print("Your cookies may have expired. Try refreshing headers_auth.json")
+                print("Your cookies may have expired. Try refreshing headers_auth.json or setting up OAuth")
                 _ytmusic_instance = YTMusic()
         else:
             # Try without auth (may trigger bot detection)
+            print("Warning: No authentication found. Bot detection errors may occur.")
+            print("Set up OAuth (recommended) or headers_auth.json (see README.md)")
             _ytmusic_instance = YTMusic()
     return _ytmusic_instance
 

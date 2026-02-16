@@ -9,4 +9,6 @@ venv/
 .venv/
 *.log
 headers_auth.json
+oauth.json
+oauth_config.json
 

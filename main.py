@@ -103,12 +103,18 @@ if __name__ == "__main__":
     os.makedirs("cache/metadata", exist_ok=True)
     os.makedirs("cache/dfpwm", exist_ok=True)
     
-    # Check for authentication file
-    if not os.path.exists("headers_auth.json"):
-        print("Warning: headers_auth.json not found. You may encounter bot detection errors.")
-        print("To fix this, create headers_auth.json (see README.md for instructions)")
-    else:
+    # Check for authentication files
+    has_oauth = os.path.exists("oauth.json") and os.path.exists("oauth_config.json")
+    has_headers = os.path.exists("headers_auth.json")
+    
+    if has_oauth:
+        print("OAuth authentication configured")
+    elif has_headers:
         print("Using headers_auth.json for authentication")
+        print("Note: OAuth is recommended for better reliability (see README.md)")
+    else:
+        print("Warning: No authentication found. You may encounter bot detection errors.")
+        print("Set up OAuth (recommended) or headers_auth.json (see README.md for instructions)")
     
     print("Starting CC:Tweaked YouTube Music Backend on http://localhost:3000")
     uvicorn.run(app, host="0.0.0.0", port=3000)
