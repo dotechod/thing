@@ -1,9 +1,7 @@
 import os
 import json
 from typing import List, Dict
-from api import get_ytmusic
-
-ytmusic = get_ytmusic()
+from api import get_ytmusic, rate_limit, is_bot_detection_error
 
 LYRICS_CACHE_DIR = os.path.join("cache", "lyrics")
 os.makedirs(LYRICS_CACHE_DIR, exist_ok=True)
@@ -21,6 +19,8 @@ async def get_lyrics(video_id: str) -> List[Dict]:
     
     try:
         # Get lyrics from YTMusic
+        rate_limit()  # Add delay between requests
+        ytmusic = get_ytmusic()
         song_info = ytmusic.get_song(video_id)
         
         if not song_info or 'lyrics' not in song_info or not song_info['lyrics']:
@@ -75,8 +75,7 @@ async def get_lyrics(video_id: str) -> List[Dict]:
         return formatted_lyrics
         
     except Exception as e:
-        error_msg = str(e).lower()
-        if "bot" in error_msg or "captcha" in error_msg or "verify" in error_msg:
+        if is_bot_detection_error(e):
             print(f"Bot detection error: {e}")
             print("To fix this, create headers_auth.json with your YouTube Music authentication.")
         else:

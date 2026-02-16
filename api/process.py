@@ -3,9 +3,7 @@ import os
 import json
 import re
 from typing import Dict, Optional
-from api import get_ytmusic
-
-ytmusic = get_ytmusic()
+from api import get_ytmusic, rate_limit, is_bot_detection_error
 
 # Cache directory
 CACHE_DIR = "cache"
@@ -59,6 +57,8 @@ async def process_video(video_id_or_url: str) -> Dict:
             
             try:
                 # Try to get more detailed info from YTMusic
+                rate_limit()  # Add delay between requests
+                ytmusic = get_ytmusic()
                 song_info = ytmusic.get_song(video_id)
                 if song_info and 'videoDetails' in song_info:
                     vd = song_info['videoDetails']
@@ -67,8 +67,7 @@ async def process_video(video_id_or_url: str) -> Dict:
                     if 'album' in vd:
                         album = vd['album'].get('name') if isinstance(vd['album'], dict) else vd['album']
             except Exception as e:
-                error_msg = str(e).lower()
-                if "bot" in error_msg or "captcha" in error_msg or "verify" in error_msg:
+                if is_bot_detection_error(e):
                     print(f"Bot detection error when getting song info: {e}")
                     print("To fix this, create headers_auth.json with your YouTube Music authentication.")
                 # Fallback to yt-dlp metadata
@@ -81,12 +80,13 @@ async def process_video(video_id_or_url: str) -> Dict:
             
             # Check for lyrics availability (YTMusic sometimes has this)
             try:
+                rate_limit()  # Add delay between requests
+                ytmusic = get_ytmusic()
                 song_info = ytmusic.get_song(video_id)
                 if song_info and 'lyrics' in song_info:
                     has_lyrics = song_info['lyrics'] is not None
             except Exception as e:
-                error_msg = str(e).lower()
-                if "bot" in error_msg or "captcha" in error_msg or "verify" in error_msg:
+                if is_bot_detection_error(e):
                     print(f"Bot detection error when checking lyrics: {e}")
                 pass
             

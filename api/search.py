@@ -1,56 +1,105 @@
 from typing import List, Dict
 import re
-from api import get_ytmusic
-
-# Initialize YTMusic with authentication if available
-ytmusic = get_ytmusic()
+import time
+from api import get_ytmusic, rate_limit, is_bot_detection_error, reset_ytmusic
 
 async def search_youtube_music(query: str, max_results: int = 10) -> List[Dict]:
     """
     Search YouTube Music and return results in the format expected by the Lua client.
     Returns: List of {id, title, artist, duration}
     """
+    # Check if query is a direct video ID or URL
+    video_id = extract_video_id(query)
+    if video_id:
+        # Return single result for direct video ID
+        return [{"id": video_id, "title": query, "artist": "Unknown", "duration": "?"}]
+    
+    # Try YTMusic with retry logic
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            rate_limit()  # Add delay between requests
+            ytmusic = get_ytmusic()  # Get fresh instance
+            results = ytmusic.search(query, filter="songs", limit=max_results)
+            
+            formatted_results = []
+            for result in results:
+                if result.get("videoId"):
+                    # Extract duration
+                    duration = "?"
+                    if "duration" in result:
+                        duration = result["duration"]
+                    elif "length" in result:
+                        duration = result["length"]
+                    
+                    # Extract artist
+                    artist = "Unknown Artist"
+                    if "artists" in result and len(result["artists"]) > 0:
+                        artist = result["artists"][0]["name"]
+                    
+                    formatted_results.append({
+                        "id": result["videoId"],
+                        "title": result.get("title", "Unknown"),
+                        "artist": artist,
+                        "duration": duration
+                    })
+            
+            return formatted_results
+        except Exception as e:
+            if is_bot_detection_error(e):
+                print(f"Bot detection error (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    # Wait before retry with exponential backoff
+                    wait_time = (attempt + 1) * 2
+                    print(f"Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                    # Try resetting YTMusic instance
+                    reset_ytmusic()
+                    continue
+                else:
+                    # Final attempt failed, try yt-dlp fallback
+                    print("YTMusic failed, trying yt-dlp fallback...")
+                    return await search_youtube_music_ytdlp(query, max_results)
+            else:
+                print(f"Search error: {e}")
+                return []
+    
+    return []
+
+async def search_youtube_music_ytdlp(query: str, max_results: int = 10) -> List[Dict]:
+    """Fallback: Search using yt-dlp"""
     try:
-        # Check if query is a direct video ID or URL
-        video_id = extract_video_id(query)
-        if video_id:
-            # Return single result for direct video ID
-            return [{"id": video_id, "title": query, "artist": "Unknown", "duration": "?"}]
+        from yt_dlp import YoutubeDL
         
-        # Perform search
-        results = ytmusic.search(query, filter="songs", limit=max_results)
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+            'default_search': 'ytsearch',
+            'playlistend': max_results,
+        }
         
-        formatted_results = []
-        for result in results:
-            if result.get("videoId"):
-                # Extract duration
-                duration = "?"
-                if "duration" in result:
-                    duration = result["duration"]
-                elif "length" in result:
-                    duration = result["length"]
-                
-                # Extract artist
-                artist = "Unknown Artist"
-                if "artists" in result and len(result["artists"]) > 0:
-                    artist = result["artists"][0]["name"]
-                
-                formatted_results.append({
-                    "id": result["videoId"],
-                    "title": result.get("title", "Unknown"),
-                    "artist": artist,
-                    "duration": duration
-                })
-        
-        return formatted_results
+        with YoutubeDL(ydl_opts) as ydl:
+            # Search using yt-dlp
+            search_query = f"ytsearch{max_results}:{query}"
+            info = ydl.extract_info(search_query, download=False)
+            
+            if not info or 'entries' not in info:
+                return []
+            
+            formatted_results = []
+            for entry in info.get('entries', []):
+                if entry and 'id' in entry:
+                    formatted_results.append({
+                        "id": entry['id'],
+                        "title": entry.get('title', 'Unknown'),
+                        "artist": entry.get('uploader', 'Unknown Artist'),
+                        "duration": entry.get('duration_string', '?')
+                    })
+            
+            return formatted_results
     except Exception as e:
-        error_msg = str(e).lower()
-        if "bot" in error_msg or "captcha" in error_msg or "verify" in error_msg:
-            print(f"Bot detection error: {e}")
-            print("To fix this, create headers_auth.json with your YouTube Music authentication.")
-            print("See README.md for instructions.")
-        else:
-            print(f"Search error: {e}")
+        print(f"yt-dlp search error: {e}")
         return []
 
 def extract_video_id(query: str) -> str:

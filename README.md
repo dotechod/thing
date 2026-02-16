@@ -44,6 +44,9 @@ pip install -r requirements.txt
    - Follow instructions at https://ytmusicapi.readthedocs.io/en/latest/setup/browser.html
    - Without authentication, you may encounter "confirm you're not a bot" errors
    - The backend will automatically use `headers_auth.json` if it exists
+   - **Important:** If you still get bot detection errors, your cookies may have expired
+     - Refresh your `headers_auth.json` by re-exporting cookies from your browser
+     - Cookies typically expire after a few weeks or months
 
 ## Usage
 
