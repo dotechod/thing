@@ -22,28 +22,19 @@ async def search_youtube_music(query: str, max_results: int = 10) -> List[Dict]:
             rate_limit()  # Add delay between requests
             ytmusic = get_ytmusic()  # Get fresh instance
             
-            # Check if using OAuth - OAuth may not support filter parameter
+            # Check if using OAuth - OAuth does NOT support filter parameter (causes HTTP 400)
             using_oauth = os.path.exists("oauth.json") and os.path.exists("oauth_config.json")
             
-            # Try search - OAuth may not support filter parameter
+            # Try search - OAuth does NOT support filter parameter
             results = None
             if using_oauth:
-                # With OAuth, try without filter first (filter may cause 400 error)
-                try:
-                    results = ytmusic.search(query, limit=max_results)
-                    # Filter results to songs manually - keep only results with videoId
-                    if results:
-                        results = [r for r in results if r.get("videoId")]
-                        # Limit to max_results
-                        results = results[:max_results]
-                except Exception as oauth_error:
-                    # If that fails, try with filter as fallback
-                    error_msg = str(oauth_error).lower()
-                    if "400" not in str(oauth_error) and "invalid" not in error_msg:
-                        # Not a 400 error, try with filter
-                        results = ytmusic.search(query, filter="songs", limit=max_results)
-                    else:
-                        raise
+                # With OAuth, NEVER use filter - it causes HTTP 400
+                results = ytmusic.search(query, limit=max_results * 2)  # Get more results to filter
+                # Filter results to songs manually - keep only results with videoId
+                if results:
+                    results = [r for r in results if r.get("videoId") and r.get("resultType") in ["song", "video"]]
+                    # Limit to max_results
+                    results = results[:max_results]
             else:
                 # With headers auth, try with filter first
                 try:
@@ -53,7 +44,7 @@ async def search_youtube_music(query: str, max_results: int = 10) -> List[Dict]:
                     error_msg = str(filter_error).lower()
                     if "400" in str(filter_error) or "invalid" in error_msg or "bad request" in error_msg:
                         print(f"Search with filter failed, trying without filter...")
-                        results = ytmusic.search(query, limit=max_results)
+                        results = ytmusic.search(query, limit=max_results * 2)
                         # Filter results to songs manually
                         if results:
                             results = [r for r in results if r.get("videoId")]
