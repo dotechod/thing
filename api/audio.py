@@ -25,7 +25,21 @@ async def get_audio_chunk(video_id: str, offset: int, size: int, channel: Option
         dfpwm_file = ensure_dfpwm_ready(video_id, channel)
         
         if not dfpwm_file or not os.path.exists(dfpwm_file):
-            return {"data": "", "done": True}
+            # Check if audio file exists - if not, audio download may have failed
+            audio_file = None
+            for ext in ['m4a', 'mp3', 'webm', 'opus']:
+                test_file = os.path.join(AUDIO_CACHE_DIR, f"{video_id}.{ext}")
+                if os.path.exists(test_file):
+                    audio_file = test_file
+                    break
+            
+            if not audio_file:
+                # Audio file doesn't exist - download may have failed
+                print(f"Warning: Audio file not found for {video_id}, chunks will be empty")
+                return {"data": "", "done": True, "error": "Audio file not available"}
+            
+            # Audio exists but DFPWM not converted yet - return empty for now
+            return {"data": "", "done": False}
         
         file_size = os.path.getsize(dfpwm_file)
         
@@ -51,7 +65,7 @@ async def get_audio_chunk(video_id: str, offset: int, size: int, channel: Option
         
     except Exception as e:
         print(f"Audio chunk error for {video_id}: {e}")
-        return {"data": "", "done": True}
+        return {"data": "", "done": True, "error": str(e)}
 
 def ensure_dfpwm_ready(video_id: str, channel: Optional[str] = None) -> Optional[str]:
     """Ensure DFPWM file exists, create if needed"""

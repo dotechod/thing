@@ -74,11 +74,31 @@ async def process_video(video_id_or_url: str) -> Dict:
     if not title:
         try:
             # Get video info using yt-dlp as fallback
+            # Check for cookies to help with bot detection
+            cookies_file = None
+            if os.path.exists("headers_auth.json"):
+                try:
+                    with open("headers_auth.json", 'r') as f:
+                        headers_data = json.load(f)
+                        if 'cookie' in headers_data:
+                            cookies_file = "headers_auth.json"
+                except:
+                    pass
+            
             ydl_opts = {
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': False,
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'referer': 'https://www.youtube.com/',
+                'cookiefile': cookies_file if cookies_file else None,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],
+                    }
+                },
             }
+            ydl_opts = {k: v for k, v in ydl_opts.items() if v is not None}
             
             with YoutubeDL(ydl_opts) as ydl:
                 url = f"https://www.youtube.com/watch?v={video_id}"
@@ -108,7 +128,9 @@ async def process_video(video_id_or_url: str) -> Dict:
                 # Continue with minimal metadata
             else:
                 print(f"yt-dlp error for {video_id}: {e}")
-                return {"error": f"Failed to get video info: {str(e)}"}
+                # Don't fail completely, return minimal metadata
+                if not title:
+                    title = f"Video {video_id}"
     
     # Create metadata
     metadata = {
@@ -163,6 +185,21 @@ def ensure_audio_downloaded(video_id: str):
     if os.path.exists(audio_file):
         return
     
+    # Check for cookies from headers_auth.json to help with bot detection
+    cookies_file = None
+    if os.path.exists("headers_auth.json"):
+        try:
+            import json
+            with open("headers_auth.json", 'r') as f:
+                headers_data = json.load(f)
+                # Extract cookies if available
+                if 'cookie' in headers_data:
+                    # yt-dlp can use cookies from a file or from headers
+                    # We'll try to use the cookie string directly
+                    cookies_file = "headers_auth.json"
+        except:
+            pass
+    
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -171,12 +208,26 @@ def ensure_audio_downloaded(video_id: str):
                 'outtmpl': audio_file.replace('.m4a', '.%(ext)s'),
                 'quiet': True,
                 'no_warnings': True,
+                # Better user agent to avoid bot detection
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'referer': 'https://www.youtube.com/',
+                # Add cookies if available
+                'cookiefile': cookies_file if cookies_file else None,
+                # Additional options to reduce bot detection
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],  # Try android client first
+                    }
+                },
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'm4a',
                     'preferredquality': '192',
                 }],
             }
+            
+            # Remove None values
+            ydl_opts = {k: v for k, v in ydl_opts.items() if v is not None}
             
             with YoutubeDL(ydl_opts) as ydl:
                 url = f"https://www.youtube.com/watch?v={video_id}"
@@ -188,13 +239,14 @@ def ensure_audio_downloaded(video_id: str):
                     if os.path.exists(temp_file):
                         if ext != 'm4a':
                             os.rename(temp_file, audio_file)
+                        print(f"Successfully downloaded audio for {video_id}")
                         return  # Success
                 break  # Success
                 
         except Exception as e:
             error_msg = str(e).lower()
             if ("bot" in error_msg or "sign in" in error_msg or "confirm" in error_msg) and attempt < max_retries - 1:
-                wait_time = (attempt + 1) * 5  # Wait 5, 10, 15 seconds
+                wait_time = (attempt + 1) * 10  # Wait 10, 20, 30 seconds (longer waits)
                 print(f"Audio download bot detection error (attempt {attempt + 1}/{max_retries}) for {video_id}, retrying in {wait_time}s...")
                 import time
                 time.sleep(wait_time)
@@ -203,5 +255,9 @@ def ensure_audio_downloaded(video_id: str):
                 print(f"Audio download error for {video_id}: {e}")
                 if attempt == max_retries - 1:
                     print(f"Failed to download audio for {video_id} after {max_retries} attempts")
+                    print("Note: YouTube bot detection is blocking downloads. Consider:")
+                    print("  1. Using headers_auth.json with fresh cookies")
+                    print("  2. Waiting longer between requests")
+                    print("  3. Using a VPN or different IP")
                 break
 
