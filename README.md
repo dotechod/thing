@@ -39,10 +39,11 @@ brew install ffmpeg
 pip install -r requirements.txt
 ```
 
-2. (Optional) Set up YTMusic authentication:
+2. **Recommended:** Set up YTMusic authentication to avoid bot detection errors:
    - Create `headers_auth.json` in the backend directory
    - Follow instructions at https://ytmusicapi.readthedocs.io/en/latest/setup/browser.html
-   - This is optional - search works without authentication
+   - Without authentication, you may encounter "confirm you're not a bot" errors
+   - The backend will automatically use `headers_auth.json` if it exists
 
 ## Usage
 

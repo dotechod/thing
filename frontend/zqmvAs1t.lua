@@ -4,7 +4,7 @@
 -- Updated for ytmusicapi backend
 -- ============================================================
 
-local SERVER = "http://localhost:3000"
+local SERVER = "http://159.54.173.26:3000"
 local LYRIC_OFFSET = 0
 local BACK_DOUBLE_TAP_TIMEOUT_MS = 1800
 local AUDIO_CHUNK_SIZE = 4 * 1024

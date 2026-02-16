@@ -1,8 +1,8 @@
-from ytmusicapi import YTMusic
 from typing import Dict, List
 import re
+from api import get_ytmusic
 
-ytmusic = YTMusic()
+ytmusic = get_ytmusic()
 
 async def get_playlist(playlist_id: str) -> Dict:
     """
@@ -37,8 +37,14 @@ async def get_playlist(playlist_id: str) -> Dict:
             return await get_playlist_ytdlp(playlist_id)
             
     except Exception as e:
-        print(f"Playlist error for {playlist_id}: {e}")
-        return {"error": str(e)}
+        error_msg = str(e).lower()
+        if "bot" in error_msg or "captcha" in error_msg or "verify" in error_msg:
+            print(f"Bot detection error: {e}")
+            print("To fix this, create headers_auth.json with your YouTube Music authentication.")
+            return {"error": "Bot detection error. Please set up headers_auth.json (see README.md)"}
+        else:
+            print(f"Playlist error for {playlist_id}: {e}")
+            return {"error": str(e)}
 
 async def get_playlist_ytdlp(playlist_id: str) -> Dict:
     """Fallback: Get playlist using yt-dlp"""

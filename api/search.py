@@ -1,9 +1,9 @@
-from ytmusicapi import YTMusic
 from typing import List, Dict
 import re
+from api import get_ytmusic
 
-# Initialize YTMusic (no auth needed for search)
-ytmusic = YTMusic()
+# Initialize YTMusic with authentication if available
+ytmusic = get_ytmusic()
 
 async def search_youtube_music(query: str, max_results: int = 10) -> List[Dict]:
     """
@@ -44,7 +44,13 @@ async def search_youtube_music(query: str, max_results: int = 10) -> List[Dict]:
         
         return formatted_results
     except Exception as e:
-        print(f"Search error: {e}")
+        error_msg = str(e).lower()
+        if "bot" in error_msg or "captcha" in error_msg or "verify" in error_msg:
+            print(f"Bot detection error: {e}")
+            print("To fix this, create headers_auth.json with your YouTube Music authentication.")
+            print("See README.md for instructions.")
+        else:
+            print(f"Search error: {e}")
         return []
 
 def extract_video_id(query: str) -> str:
