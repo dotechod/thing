@@ -7,6 +7,9 @@ AUDIO_CACHE_DIR = os.path.join("cache", "audio")
 DFPWM_CACHE_DIR = os.path.join("cache", "dfpwm")
 os.makedirs(DFPWM_CACHE_DIR, exist_ok=True)
 
+# Track which videos we've already warned about to reduce log spam
+_warned_videos = set()
+
 # DFPWM encoding parameters
 SAMPLE_RATE = 48000
 BYTES_PER_SAMPLE = 1  # DFPWM is 8-bit
@@ -35,7 +38,10 @@ async def get_audio_chunk(video_id: str, offset: int, size: int, channel: Option
             
             if not audio_file:
                 # Audio file doesn't exist - download may have failed
-                print(f"Warning: Audio file not found for {video_id}, chunks will be empty")
+                # Only warn once per video to reduce log spam
+                if video_id not in _warned_videos:
+                    print(f"Warning: Audio file not found for {video_id}, chunks will be empty (YouTube bot detection blocking downloads)")
+                    _warned_videos.add(video_id)
                 return {"data": "", "done": True, "error": "Audio file not available"}
             
             # Audio exists but DFPWM not converted yet - return empty for now

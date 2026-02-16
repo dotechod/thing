@@ -116,6 +116,15 @@ if __name__ == "__main__":
         print("Warning: No authentication found. You may encounter bot detection errors.")
         print("Set up OAuth (recommended) or headers_auth.json (see README.md for instructions)")
     
+    # Check for WARP proxy
+    use_warp = os.environ.get('USE_WARP', 'false').lower() == 'true'
+    warp_proxy = os.environ.get('WARP_PROXY', 'socks5://127.0.0.1:40000')
+    if use_warp:
+        print(f"WARP proxy enabled: {warp_proxy}")
+        print("Note: Make sure WARP is running in proxy mode: warp-cli connect")
+    else:
+        print("WARP proxy disabled (set USE_WARP=true to enable)")
+    
     print("Starting CC:Tweaked YouTube Music Backend on http://localhost:3000")
     uvicorn.run(app, host="0.0.0.0", port=3000)
 

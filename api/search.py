@@ -29,12 +29,20 @@ async def search_youtube_music(query: str, max_results: int = 10) -> List[Dict]:
             results = None
             if using_oauth:
                 # With OAuth, NEVER use filter - it causes HTTP 400
-                results = ytmusic.search(query, limit=max_results * 2)  # Get more results to filter
-                # Filter results to songs manually - keep only results with videoId
-                if results:
-                    results = [r for r in results if r.get("videoId") and r.get("resultType") in ["song", "video"]]
-                    # Limit to max_results
-                    results = results[:max_results]
+                try:
+                    results = ytmusic.search(query, limit=max_results * 2)  # Get more results to filter
+                    # Filter results to songs manually - keep only results with videoId
+                    if results:
+                        results = [r for r in results if r.get("videoId") and r.get("resultType") in ["song", "video"]]
+                        # Limit to max_results
+                        results = results[:max_results]
+                except Exception as oauth_search_error:
+                    # OAuth search might also fail on cloud IPs - fall back to yt-dlp
+                    error_msg = str(oauth_search_error).lower()
+                    if "400" in str(oauth_search_error) or "invalid" in error_msg:
+                        print(f"OAuth search failed (likely cloud IP issue), falling back to yt-dlp...")
+                        raise  # Will be caught and handled by outer try/except
+                    raise
             else:
                 # With headers auth, try with filter first
                 try:
@@ -111,13 +119,19 @@ async def search_youtube_music_ytdlp(query: str, max_results: int = 10) -> List[
     try:
         from yt_dlp import YoutubeDL
         
+        # Check for WARP proxy
+        warp_proxy = os.environ.get('WARP_PROXY', 'socks5://127.0.0.1:40000')
+        use_warp = os.environ.get('USE_WARP', 'false').lower() == 'true'
+        
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
             'default_search': 'ytsearch',
             'playlistend': max_results,
+            'proxy': warp_proxy if use_warp else None,
         }
+        ydl_opts = {k: v for k, v in ydl_opts.items() if v is not None}
         
         with YoutubeDL(ydl_opts) as ydl:
             # Search using yt-dlp

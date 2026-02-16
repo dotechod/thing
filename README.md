@@ -138,3 +138,36 @@ The backend caches:
 - DFPWM encoding is done on-the-fly
 - The backend supports both mono and stereo audio
 
+## Cloud/VPS Limitations
+
+**Important:** If you're running this on a cloud/VPS provider (AWS, Google Cloud, Oracle Cloud, DigitalOcean, etc.), YouTube's bot detection will likely block audio downloads. Cloud IPs are heavily flagged by YouTube.
+
+**Solutions:**
+1. **Use Cloudflare WARP (Recommended for Cloud)** - WARP can help mask your cloud IP:
+   ```bash
+   # Install WARP
+   curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+   echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+   sudo apt-get update && sudo apt-get install cloudflare-warp
+   
+   # Set up WARP in proxy mode
+   warp-cli register
+   warp-cli set-mode proxy
+   warp-cli connect
+   
+   # Enable WARP in the backend (set before starting)
+   export USE_WARP=true
+   export WARP_PROXY=socks5://127.0.0.1:40000  # Default WARP proxy
+   python main.py
+   ```
+
+2. **Use a residential IP** - Run the backend on a home computer or residential internet connection
+3. **Use a VPN/proxy** - Route traffic through a residential VPN or proxy service
+4. **Pre-download audio** - Manually download audio files and place them in `cache/audio/` with the format `{video_id}.m4a`
+5. **Use fresh cookies** - If using `headers_auth.json`, export very fresh cookies from your browser while logged into YouTube
+
+**Testing OAuth:**
+Run `python test_oauth.py` to verify your OAuth authentication is working correctly.
+
+Even with OAuth authentication, YouTube may still block requests from cloud IPs. This is a limitation of YouTube's bot detection system, not the backend code.
+

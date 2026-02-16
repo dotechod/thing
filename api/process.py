@@ -85,12 +85,17 @@ async def process_video(video_id_or_url: str) -> Dict:
                 except:
                     pass
             
+            # Check for WARP proxy
+            warp_proxy_meta = os.environ.get('WARP_PROXY', 'socks5://127.0.0.1:40000')
+            use_warp_meta = os.environ.get('USE_WARP', 'false').lower() == 'true'
+            
             ydl_opts = {
                 'quiet': True,
                 'no_warnings': True,
                 'extract_flat': False,
                 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'referer': 'https://www.youtube.com/',
+                'proxy': warp_proxy_meta if use_warp_meta else None,
                 'extractor_args': {
                     'youtube': {
                         'player_client': ['android', 'ios', 'web'],
@@ -205,6 +210,11 @@ def ensure_audio_downloaded(video_id: str):
         except:
             pass
     
+    # Check for WARP proxy (Cloudflare WARP in proxy mode)
+    # Default WARP proxy is SOCKS5 on 127.0.0.1:40000
+    warp_proxy = os.environ.get('WARP_PROXY', 'socks5://127.0.0.1:40000')
+    use_warp = os.environ.get('USE_WARP', 'false').lower() == 'true'
+    
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -217,6 +227,8 @@ def ensure_audio_downloaded(video_id: str):
                 # Better user agent to avoid bot detection
                 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'referer': 'https://www.youtube.com/',
+                # Use WARP proxy if enabled
+                'proxy': warp_proxy if use_warp else None,
                 # Additional options to reduce bot detection for cloud IPs
                 'extractor_args': {
                     'youtube': {
@@ -243,6 +255,9 @@ def ensure_audio_downloaded(video_id: str):
             # Handle http_headers separately
             if not cookie_string:
                 ydl_opts.pop('http_headers', None)
+            
+            if use_warp:
+                print(f"Using WARP proxy: {warp_proxy}")
             
             with YoutubeDL(ydl_opts) as ydl:
                 url = f"https://www.youtube.com/watch?v={video_id}"

@@ -40,6 +40,22 @@ def get_ytmusic():
                     )
                     _ytmusic_instance = YTMusic(oauth_file, oauth_credentials=oauth_credentials)
                     print("Using OAuth authentication")
+                    
+                    # Test OAuth by trying a simple operation
+                    try:
+                        # Try to get library (this will fail if OAuth isn't working)
+                        # But we'll catch the error and continue anyway
+                        test_result = _ytmusic_instance.get_library_playlists(limit=1)
+                        print("OAuth verified: Authentication is working")
+                    except Exception as test_error:
+                        error_msg = str(test_error).lower()
+                        if "400" in str(test_error) or "invalid" in error_msg or "unauthorized" in error_msg:
+                            print(f"Warning: OAuth may not be working properly: {test_error}")
+                            print("OAuth credentials may be invalid or expired. Try re-running 'ytmusicapi oauth'")
+                        else:
+                            # Other errors are OK, OAuth is probably working
+                            print("OAuth initialized (test skipped due to non-auth error)")
+                    
                     return _ytmusic_instance
                 else:
                     print("Warning: oauth_config.json missing client_id or client_secret")

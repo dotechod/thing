@@ -50,13 +50,20 @@ async def get_playlist_ytdlp(playlist_id: str) -> Dict:
     """Fallback: Get playlist using yt-dlp"""
     try:
         from yt_dlp import YoutubeDL
+        import os
+        
+        # Check for WARP proxy
+        warp_proxy = os.environ.get('WARP_PROXY', 'socks5://127.0.0.1:40000')
+        use_warp = os.environ.get('USE_WARP', 'false').lower() == 'true'
         
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
             'playlistend': 200,  # Limit to 200 tracks
+            'proxy': warp_proxy if use_warp else None,
         }
+        ydl_opts = {k: v for k, v in ydl_opts.items() if v is not None}
         
         url = f"https://www.youtube.com/playlist?list={playlist_id}"
         
